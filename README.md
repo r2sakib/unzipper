@@ -48,6 +48,13 @@ Unzipper is an utility for automatically extracting ZIP and RAR files from a mon
 6. **Logs**:
    - All actions and errors are shown in the log area at the bottom.
 
+## Download
+
+A pre-built Windows executable (EXE) is provided for convenience. You can use it directly without installing Python or any dependencies.
+
+- Download the latest EXE from the [Releases](https://github.com/yourusername/unzipper/releases) section (or from this repository if provided).
+- Simply double-click the EXE to run Unzipper on Windows.
+
 ## Building as an EXE
 
 - Use [PyInstaller](https://pyinstaller.org/) to build:
