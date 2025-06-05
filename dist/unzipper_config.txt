@@ -5,4 +5,4 @@ delete_after_extracted=False
 file_exts=
 logic_input=
 copy_enabled=False
-logic_enabled=False
+logic_enabled=True

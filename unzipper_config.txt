@@ -4,5 +4,5 @@ delete_after_zip=True
 delete_after_extracted=False
 file_exts=jpg, png
 logic_input=docx; jpg
-copy_enabled=True
+copy_enabled=False
 logic_enabled=True

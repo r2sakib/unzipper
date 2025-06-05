@@ -125,17 +125,53 @@ class ZipExtractorHandler(FileSystemEventHandler):
         else:
             print(msg)
 
+    def _wait_until_file_ready(self, file_path, timeout=10):
+        """Wait until the file is not growing in size (download complete)."""
+        import time
+        last_size = -1
+        stable_count = 0
+        start = time.time()
+        while time.time() - start < timeout:
+            try:
+                size = os.path.getsize(file_path)
+                if size == last_size:
+                    stable_count += 1
+                    if stable_count >= 2:
+                        return True
+                else:
+                    stable_count = 0
+                last_size = size
+            except Exception:
+                pass
+            time.sleep(0.5)
+        return False
+
     def on_created(self, event):
         if event.is_directory:
             return
         file_path = Path(event.src_path)
         ext = file_path.suffix.lower()
         if ext in self.archive_exts and file_path not in self.processed_files:
-            time.sleep(1)
-            if ext == '.zip':
-                self.extract_zip(file_path)
-            elif ext == '.rar':
-                self.extract_rar(file_path)
+            if self._wait_until_file_ready(file_path):
+                time.sleep(0.5)
+                if ext == '.zip':
+                    self.extract_zip(file_path)
+                elif ext == '.rar':
+                    self.extract_rar(file_path)
+
+    def on_moved(self, event):
+        # Handle file renames (e.g., .crdownload -> .zip)
+        if event.is_directory:
+            return
+        file_path = Path(event.dest_path)
+        ext = file_path.suffix.lower()
+        if ext in self.archive_exts and file_path not in self.processed_files:
+            if self._wait_until_file_ready(file_path):
+                time.sleep(0.5)
+                if ext == '.zip':
+                    self.extract_zip(file_path)
+                elif ext == '.rar':
+                    self.extract_rar(file_path)
 
     def extract_zip(self, zip_path, stop_event=None):
         try:
@@ -636,15 +672,23 @@ class UnzipperGUI:
         # Ensure tray_icon is always defined
         self.tray_icon = None
 
+    def restart_monitoring(self):
+        # Stop and restart monitoring if currently running
+        if hasattr(self, 'monitoring') and self.monitoring:
+            self.stop_monitoring()
+            self.start_monitoring()
+
     def select_monitor_folder(self):
         folder = filedialog.askdirectory(title="Select folder to monitor")
         if folder:
             self.monitor_var.set(folder)
+            self.restart_monitoring()
 
     def select_dest_folder(self):
         folder = filedialog.askdirectory(title="Select destination folder")
         if folder:
             self.dest_var.set(folder)
+            self.restart_monitoring()
 
     def save_config(self):
         monitor_folder = self.monitor_var.get()
@@ -684,7 +728,6 @@ class UnzipperGUI:
             self.copy_enabled_var.set(config["copy_enabled"].lower() == "true")
         if "logic_enabled" in config:
             self.copy_logic_enabled_var.set(config["logic_enabled"].lower() == "true")
-    # ...existing code...
 
     def start_monitoring(self):
         monitor_folder = self.monitor_var.get()
@@ -821,12 +864,14 @@ class UnzipperGUI:
             self.ext_entry.config(state='normal')
         else:
             self.ext_entry.config(state='disabled')
+        self.restart_monitoring()
 
     def on_copy_logic_enabled_changed(self):
         if self.copy_logic_enabled_var.get():
             self.copy_logic_entry.config(state='normal')
         else:
             self.copy_logic_entry.config(state='disabled')
+        self.restart_monitoring()
 
     def on_copy_logic_apply(self):
         # Placeholder for logic to be implemented later
