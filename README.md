@@ -52,8 +52,8 @@ Unzipper is an utility for automatically extracting ZIP and RAR files from a mon
 
 A pre-built Windows executable (EXE) is provided for convenience. You can use it directly without installing Python or any dependencies.
 
-- Download the latest EXE from the [Releases](https://github.com/yourusername/unzipper/releases) section (or from this repository if provided).
-- Simply double-click the EXE to run Unzipper on Windows.
+- Download the latest version from the [Releases](https://github.com/yourusername/unzipper/releases) section (or from this repository if provided).
+- Simply unzip the file and double-click the EXE to run Unzipper on Windows.
 
 ## Building as an EXE
 
