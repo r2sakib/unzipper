@@ -19,7 +19,21 @@ Unzipper is an utility for automatically extracting ZIP and RAR files from a mon
 - **System Tray Support**: Minimize to tray with a custom icon; restore or exit from the tray menu.
 - **Robust Error Handling**: Clear log output for all actions and errors.
 - **Config Persistence**: Remembers all settings between sessions.
-- **Beautiful, Large Checkboxes**: Modern, material-style checkboxes for all options.
+
+## Download
+
+A pre-built Windows executable (EXE) is provided for convenience. You can use it directly without installing Python or any dependencies.
+
+- Download the latest version from the [Releases](https://github.com/yourusername/unzipper/releases) section (or from this repository if provided).
+- Simply unzip the file and double-click the EXE to run Unzipper on Windows.
+
+## Building as an EXE
+
+- Use [PyInstaller](https://pyinstaller.org/) to build:
+  ```sh
+  pyinstaller --onefile --windowed --icon=icon.ico unzipper.py
+  ```
+- Make sure `icon.ico` is in the same directory as `unzipper.py`.
 
 ## How to Use
 
@@ -47,21 +61,6 @@ Unzipper is an utility for automatically extracting ZIP and RAR files from a mon
 
 6. **Logs**:
    - All actions and errors are shown in the log area at the bottom.
-
-## Download
-
-A pre-built Windows executable (EXE) is provided for convenience. You can use it directly without installing Python or any dependencies.
-
-- Download the latest version from the [Releases](https://github.com/yourusername/unzipper/releases) section (or from this repository if provided).
-- Simply unzip the file and double-click the EXE to run Unzipper on Windows.
-
-## Building as an EXE
-
-- Use [PyInstaller](https://pyinstaller.org/) to build:
-  ```sh
-  pyinstaller --onefile --windowed --icon=icon.ico unzipper.py
-  ```
-- Make sure `icon.ico` is in the same directory as `unzipper.py`.
 
 ## Requirements
 - Python 3.8+
