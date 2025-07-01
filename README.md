@@ -11,15 +11,17 @@ Unzipper is an utility for automatically extracting ZIP and RAR files from a mon
 - **Customizable Copying**:
   - Copy all files of selected extensions after extraction.
   - Advanced priority-based copy logic (e.g., copy only the highest-priority file types if present).
+  - **Copy whole extracted folder to destination** (new option, with a single checkbox).
 - **Immediate Stop Controls**: Extraction and copying can be halted instantly with a stop button.
 - **Delete Options**:
   - Delete archive after extraction.
-  - Delete extracted folder after copying.
+  - Delete extracted folder after copying (now works correctly, including when copying the whole folder).
 - **Startup Option**: Option to run Unzipper automatically at Windows startup.
 - **System Tray Support**: Minimize to tray with a custom icon; restore or exit from the tray menu.
 - **Robust Error Handling**: Clear log output for all actions and errors.
-- **Config Persistence**: Remembers all settings between sessions.
+- **Config Persistence**: Remembers all settings between sessions, including the new copy-whole-folder option.
 - **Beautiful, Large Checkboxes**: Modern, material-style checkboxes for all options.
+- **Automatic Monitoring**: Monitoring starts automatically on app launch and restarts on any relevant setting change.
 
 ## How to Use
 
@@ -30,13 +32,14 @@ Unzipper is an utility for automatically extracting ZIP and RAR files from a mon
 2. **Configure Copying**:
    - Enable "Copy files" and specify extensions (e.g., `jpg, png, ai`).
    - Or enable "Copy files with logic" and enter priority logic (e.g., `ai; png, esp; jpg`).
+   - Or enable **"Copy whole extracted folder to destination"** to copy the entire extracted folder after extraction.
 
 3. **Set Options**:
-   - Choose whether to delete archives after extraction or delete extracted folders after copying.
+   - Choose whether to delete archives after extraction or delete extracted folders after copying (works for both file and folder copy modes).
    - Enable "Run at startup" if desired.
 
 4. **Start Monitoring**:
-   - Click **Start Monitoring** to begin watching the folder.
+   - Monitoring now starts automatically when the app launches.
    - Use **Stop Monitoring** to pause.
    - Use **Extract All Existing** to process all current archives in the monitored folder.
    - Use **Stop Extracting** to halt extraction/copying immediately.
