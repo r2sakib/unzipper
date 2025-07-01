@@ -31,7 +31,7 @@ def get_base_dir():
 
 CONFIG_FILE = get_base_dir() / "unzipper_config.txt"
 
-def write_config(monitor_folder, dest_folder, delete_after_zip, delete_after_extracted, file_exts, logic_input=None, copy_enabled=None, logic_enabled=None):
+def write_config(monitor_folder, dest_folder, delete_after_zip, delete_after_extracted, file_exts, logic_input=None, copy_enabled=None, logic_enabled=None, copy_whole_folder=None):
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         f.write(f"monitor_folder={monitor_folder}\n")
         f.write(f"dest_folder={dest_folder}\n")
@@ -44,6 +44,8 @@ def write_config(monitor_folder, dest_folder, delete_after_zip, delete_after_ext
             f.write(f"copy_enabled={str(copy_enabled)}\n")
         if logic_enabled is not None:
             f.write(f"logic_enabled={str(logic_enabled)}\n")
+        if copy_whole_folder is not None:
+            f.write(f"copy_whole_folder={str(copy_whole_folder)}\n")
 
 def read_config():
     config = {}
@@ -97,7 +99,7 @@ def is_startup_enabled():
 class ZipExtractorHandler(FileSystemEventHandler):
     def __init__(
         self, download_folder, target_folder, delete_after_zip=False, delete_after_extracted=False,
-        file_exts=None, gui_callback=None, copy_enabled=True, logic_input=None, logic_enabled=False
+        file_exts=None, gui_callback=None, copy_enabled=True, logic_input=None, logic_enabled=False, copy_whole_folder=False
     ):
         self.download_folder = Path(download_folder)
         self.processed_files = set()
@@ -106,6 +108,7 @@ class ZipExtractorHandler(FileSystemEventHandler):
         self.copy_enabled = copy_enabled
         self.logic_input = logic_input
         self.logic_enabled = logic_enabled
+        self.copy_whole_folder = copy_whole_folder
         if file_exts:
             cleaned = [ext.strip().lstrip(".").lower() for ext in file_exts.split(',') if ext.strip()]
             if cleaned:
@@ -214,6 +217,9 @@ class ZipExtractorHandler(FileSystemEventHandler):
             else:
                 self.log(f"Successfully extracted to: {extract_folder}")
                 search_folder = extract_folder
+            # Copy whole folder if enabled
+            if self.copy_whole_folder:
+                self._copy_entire_folder(search_folder)
             self.copy_selected_files(search_folder, stop_event=stop_event)
             self.processed_files.add(zip_path)
             # Delete ZIP and/or extracted folder if option is enabled
@@ -311,6 +317,9 @@ class ZipExtractorHandler(FileSystemEventHandler):
             else:
                 self.log(f"Successfully extracted to: {extract_folder}")
                 search_folder = extract_folder
+            # Copy whole folder if enabled
+            if self.copy_whole_folder:
+                self._copy_entire_folder(search_folder)
             self.copy_selected_files(search_folder, stop_event=stop_event)
             self.processed_files.add(rar_path)
             if self.delete_after_zip:
@@ -424,6 +433,20 @@ class ZipExtractorHandler(FileSystemEventHandler):
             else:
                 self.log(f"Priority {idx+1}: No files found for extensions {ext_group}.")
         self.log("No files matched any priority group. Nothing copied.")
+
+    def _copy_entire_folder(self, src_folder):
+        import shutil
+        dest = self.target_folder / Path(src_folder).name
+        counter = 1
+        orig_dest = dest
+        while dest.exists():
+            dest = self.target_folder / f"{orig_dest.stem}_{counter}{orig_dest.suffix}"
+            counter += 1
+        try:
+            shutil.copytree(src_folder, dest)
+            self.log(f"Copied entire folder: {src_folder} -> {dest}")
+        except Exception as e:
+            self.log(f"Failed to copy entire folder: {src_folder} -> {dest}: {e}")
 
 class UnzipperGUI:
     def __init__(self, root):
@@ -563,6 +586,20 @@ class UnzipperGUI:
         self.copy_logic_entry.bind("<Enter>", show_tip)
         self.copy_logic_entry.bind("<Leave>", hide_tip)
 
+        # --- Third row: Copy whole extracted folder ---
+        self.copy_whole_folder_var = tk.BooleanVar(value=False)
+        self.copy_whole_folder_chk = tk.Checkbutton(
+            ext_logic_frame,
+            text="Copy whole extracted folder to destination",
+            variable=self.copy_whole_folder_var,
+            bg="#ffffff",
+            font=("Segoe UI", 11),
+            activebackground="#e3f2fd",
+            selectcolor="#e3f2fd",
+            command=self.on_copy_whole_folder_changed
+        )
+        self.copy_whole_folder_chk.grid(row=2, column=0, padx=(0, 8), pady=(2, 0), sticky="w")
+
         # Delete and startup options
         options_frame = section_frame(main_frame)
         self.delete_zip_var = tk.BooleanVar()
@@ -657,7 +694,7 @@ class UnzipperGUI:
         main_frame.pack_configure(padx=0, pady=0)
 
         # Style checkboxes
-        for chk in [self.copy_chk, self.copy_logic_chk, self.delete_zip_chk, self.delete_extracted_chk, self.startup_chk]:
+        for chk in [self.copy_chk, self.copy_logic_chk, self.copy_whole_folder_chk, self.delete_zip_chk, self.delete_extracted_chk, self.startup_chk]:
             chk.config(bg="#ffffff", activebackground="#e3f2fd", selectcolor="#e3f2fd", font=("Segoe UI", 11))
 
         # Style labels
@@ -671,6 +708,9 @@ class UnzipperGUI:
 
         # Ensure tray_icon is always defined
         self.tray_icon = None
+
+        # Start monitoring automatically after UI setup and config load
+        self.start_monitoring()
 
     def restart_monitoring(self):
         # Stop and restart monitoring if currently running
@@ -699,6 +739,7 @@ class UnzipperGUI:
         logic_input = self.copy_logic_var.get()
         copy_enabled = self.copy_enabled_var.get()
         logic_enabled = self.copy_logic_enabled_var.get()
+        copy_whole_folder = self.copy_whole_folder_var.get()
         if not monitor_folder or not dest_folder:
             messagebox.showerror("Error", "Both folders must be selected.")
             return
@@ -706,7 +747,8 @@ class UnzipperGUI:
             monitor_folder, dest_folder, delete_after_zip, delete_after_extracted,
             file_exts, logic_input,
             copy_enabled=copy_enabled,
-            logic_enabled=logic_enabled
+            logic_enabled=logic_enabled,
+            copy_whole_folder=copy_whole_folder
         )
         self.log("Configuration saved.")
 
@@ -728,6 +770,8 @@ class UnzipperGUI:
             self.copy_enabled_var.set(config["copy_enabled"].lower() == "true")
         if "logic_enabled" in config:
             self.copy_logic_enabled_var.set(config["logic_enabled"].lower() == "true")
+        if "copy_whole_folder" in config:
+            self.copy_whole_folder_var.set(config["copy_whole_folder"].lower() == "true")
 
     def start_monitoring(self):
         monitor_folder = self.monitor_var.get()
@@ -871,6 +915,9 @@ class UnzipperGUI:
             self.copy_logic_entry.config(state='normal')
         else:
             self.copy_logic_entry.config(state='disabled')
+        self.restart_monitoring()
+
+    def on_copy_whole_folder_changed(self):
         self.restart_monitoring()
 
     def on_copy_logic_apply(self):
