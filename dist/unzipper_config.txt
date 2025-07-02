@@ -1,8 +1,9 @@
 monitor_folder=C:/Users/User/Downloads
-dest_folder=C:/Users/User/Downloads
-delete_after_zip=False
-delete_after_extracted=False
-file_exts=
+dest_folder=C:/Users/User/Downloads/Test
+delete_after_zip=True
+delete_after_extracted=True
+file_exts=txt
 logic_input=
-copy_enabled=False
+copy_enabled=True
 logic_enabled=False
+copy_whole_folder=False

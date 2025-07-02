@@ -1,9 +1,9 @@
 monitor_folder=C:/Users/User/Downloads
 dest_folder=C:/Users/User/Downloads/Test
 delete_after_zip=True
-delete_after_extracted=True
+delete_after_extracted=False
 file_exts=txt
-logic_input=docx; jpg
+logic_input=docx; jpg, txt
 copy_enabled=False
-logic_enabled=False
-copy_whole_folder=True
+logic_enabled=True
+copy_whole_folder=False

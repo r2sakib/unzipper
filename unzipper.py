@@ -187,8 +187,8 @@ class ZipExtractorHandler(FileSystemEventHandler):
         try:
             shutil.copytree(src_folder, dest)
             self.log(f"Copied entire folder: {src_folder} -> {dest}")
-            # Delete extracted folder after copying if option is enabled
-            if self.delete_after_extracted and src_folder.exists():
+            # Always delete extracted folder after copying if option is enabled
+            if self.delete_after_extracted and Path(src_folder).exists():
                 try:
                     shutil.rmtree(src_folder)
                     self.log(f"Deleted extracted folder after copying: {src_folder}")
@@ -208,10 +208,7 @@ class ZipExtractorHandler(FileSystemEventHandler):
                 for member in zip_ref.namelist():
                     parts = member.split('/')
                     if len(parts) == 1 or (len(parts) == 2 and parts[1] == ''):
-                        if member.endswith('/'):
-                            root_dirs.add(parts[0])
-                        else:
-                            root_files.add(parts[0])
+                        root_files.add(parts[0])
                     else:
                         root_dirs.add(parts[0])
                 root_dirs = {d for d in root_dirs if any(f.startswith(d + '/') for f in zip_ref.namelist())}
@@ -238,13 +235,11 @@ class ZipExtractorHandler(FileSystemEventHandler):
             if self.copy_whole_folder:
                 self.log("Copying entire extracted folder to destination (option enabled)...")
                 self._copy_entire_folder(search_folder)
-                # Do not delete again below if already deleted
-                deleted = self.delete_after_extracted and not search_folder.exists()
+                # Always try to delete after copying (handled in _copy_entire_folder)
             else:
-                deleted = False
-            self.copy_selected_files(search_folder, stop_event=stop_event)
+                self.copy_selected_files(search_folder, stop_event=stop_event)
             self.processed_files.add(zip_path)
-            # Delete ZIP and/or extracted folder if option is enabled
+            # Delete ZIP if option is enabled
             if self.delete_after_zip:
                 try:
                     if zip_path.exists():
@@ -252,14 +247,6 @@ class ZipExtractorHandler(FileSystemEventHandler):
                         self.log(f"Deleted ZIP file: {zip_path}")
                 except Exception as e:
                     self.log(f"Failed to delete ZIP file: {zip_path} ({e})")
-            # Only delete if not already deleted by _copy_entire_folder
-            if self.delete_after_extracted and not extract_to_downloads and search_folder.exists() and not deleted:
-                try:
-                    import shutil
-                    shutil.rmtree(search_folder)
-                    self.log(f"Deleted extracted folder: {search_folder}")
-                except Exception as e:
-                    self.log(f"Failed to delete extracted folder: {search_folder} ({e})")
         except zipfile.BadZipFile:
             self.log(f"Error: {zip_path.name} is not a valid ZIP file or is corrupted")
         except PermissionError:
@@ -283,7 +270,7 @@ class ZipExtractorHandler(FileSystemEventHandler):
                     try:
                         tool_found = rarfile._get_unrar_tool() is not None
                     except Exception:
-                        tool_found = False
+                        pass
                 if not tool_found:
                     self.log(
                         "Error: No working unrar/rar tool found. Please install 'unrar' or 'rar' and ensure it is in your PATH.\n"
@@ -301,10 +288,7 @@ class ZipExtractorHandler(FileSystemEventHandler):
                     for member in rar_ref.namelist():
                         parts = member.split('/')
                         if len(parts) == 1 or (len(parts) == 2 and parts[1] == ''):
-                            if member.endswith('/'):
-                                root_dirs.add(parts[0])
-                            else:
-                                root_files.add(parts[0])
+                            root_files.add(parts[0])
                         else:
                             root_dirs.add(parts[0])
                     root_dirs = {d for d in root_dirs if any(f.startswith(d + '/') for f in rar_ref.namelist())}
@@ -340,10 +324,9 @@ class ZipExtractorHandler(FileSystemEventHandler):
             if self.copy_whole_folder:
                 self.log("Copying entire extracted folder to destination (option enabled)...")
                 self._copy_entire_folder(search_folder)
-                deleted = self.delete_after_extracted and not search_folder.exists()
+                # Always try to delete after copying (handled in _copy_entire_folder)
             else:
-                deleted = False
-            self.copy_selected_files(search_folder, stop_event=stop_event)
+                self.copy_selected_files(search_folder, stop_event=stop_event)
             self.processed_files.add(rar_path)
             if self.delete_after_zip:
                 try:
@@ -352,13 +335,6 @@ class ZipExtractorHandler(FileSystemEventHandler):
                         self.log(f"Deleted RAR file: {rar_path}")
                 except Exception as e:
                     self.log(f"Failed to delete RAR file: {rar_path} ({e})")
-            if self.delete_after_extracted and not extract_to_downloads and search_folder.exists() and not deleted:
-                try:
-                    import shutil
-                    shutil.rmtree(search_folder)
-                    self.log(f"Deleted extracted folder: {search_folder}")
-                except Exception as e:
-                    self.log(f"Failed to delete extracted folder: {search_folder} ({e})")
         except rarfile.BadRarFile:
             self.log(f"Error: {rar_path.name} is not a valid RAR file or is corrupted")
         except PermissionError:
@@ -367,15 +343,17 @@ class ZipExtractorHandler(FileSystemEventHandler):
             self.log(f"Error extracting {rar_path.name}: {str(e)}")
 
     def copy_selected_files(self, folder, stop_event=None):
+        deleted = False
+        copied_any = False
         # Each option works independently, both can copy files if both are enabled
         if self.logic_enabled and self.logic_input:
-            self._copy_files_with_priority_logic(folder, stop_event=stop_event)
+            copied_any = self._copy_files_with_priority_logic(folder, stop_event=stop_event) or copied_any
         if self.copy_enabled:
             for root, dirs, files in os.walk(folder):
                 for file in files:
                     if stop_event and stop_event.is_set():
                         self.log("Copying stopped by user.")
-                        return
+                        return deleted
                     ext = Path(file).suffix.lower().lstrip(".")
                     if self.collect_exts is None or ext in self.collect_exts:
                         src_file = Path(root) / file
@@ -389,15 +367,23 @@ class ZipExtractorHandler(FileSystemEventHandler):
                         try:
                             copy2(src_file, dest_file)
                             self.log(f"Copied: {src_file} -> {dest_file}")
+                            copied_any = True
                         except Exception as e:
                             self.log(f"Failed to copy {src_file}: {e}")
+        if (self.copy_enabled or (self.logic_enabled and self.logic_input)) and self.delete_after_extracted and Path(folder).exists() and copied_any:
+            try:
+                import shutil
+                shutil.rmtree(folder)
+                self.log(f"Deleted extracted folder after copying: {folder}")
+                deleted = True
+            except Exception as e:
+                self.log(f"Failed to delete extracted folder after copying: {folder} ({e})")
         if not self.copy_enabled and not (self.logic_enabled and self.logic_input):
             self.log("Copying skipped (option not selected).")
+        return deleted
 
     def _copy_files_with_priority_logic(self, folder, stop_event=None):
         logic_input = self.logic_input or ""
-        # Parse logic: "1-ai; 2-png, esp; 3-jpg"
-        # Result: [[ai], [png, esp], [jpg]]
         priorities = []
         for part in logic_input.split(";"):
             part = part.strip()
@@ -413,7 +399,7 @@ class ZipExtractorHandler(FileSystemEventHandler):
                 priorities.append(ext_list)
         if not priorities:
             self.log("No valid logic found in input.")
-            return
+            return False
 
         self.log(f"Priority logic parsed: {priorities}")
 
@@ -429,7 +415,7 @@ class ZipExtractorHandler(FileSystemEventHandler):
             for f in all_files:
                 if stop_event and stop_event.is_set():
                     self.log("Copying stopped by user.")
-                    return
+                    return False
                 ext = f.suffix.lower().lstrip(".")
                 if ext in ext_group:
                     matched_files.append(f)
@@ -438,7 +424,7 @@ class ZipExtractorHandler(FileSystemEventHandler):
                 for src_file in matched_files:
                     if stop_event and stop_event.is_set():
                         self.log("Copying stopped by user.")
-                        return
+                        return False
                     dest_file = self.target_folder / src_file.name
                     counter = 1
                     base_name = dest_file.stem
@@ -452,10 +438,11 @@ class ZipExtractorHandler(FileSystemEventHandler):
                     except Exception as e:
                         self.log(f"Failed to copy {src_file}: {e}")
                 self.log(f"Stopped at priority {idx+1}, no lower priorities will be checked.")
-                return
+                return True
             else:
                 self.log(f"Priority {idx+1}: No files found for extensions {ext_group}.")
         self.log("No files matched any priority group. Nothing copied.")
+        return False
 
     def _copy_entire_folder(self, src_folder):
         import shutil
@@ -468,6 +455,13 @@ class ZipExtractorHandler(FileSystemEventHandler):
         try:
             shutil.copytree(src_folder, dest)
             self.log(f"Copied entire folder: {src_folder} -> {dest}")
+            # Always delete extracted folder after copying if option is enabled
+            if self.delete_after_extracted and Path(src_folder).exists():
+                try:
+                    shutil.rmtree(src_folder)
+                    self.log(f"Deleted extracted folder after copying: {src_folder}")
+                except Exception as e:
+                    self.log(f"Failed to delete extracted folder after copying: {src_folder} ({e})")
         except Exception as e:
             self.log(f"Failed to copy entire folder: {src_folder} -> {dest}: {e}")
 
@@ -628,9 +622,9 @@ class UnzipperGUI:
         options_frame = section_frame(main_frame)
         self.delete_zip_var = tk.BooleanVar()
         self.delete_extracted_var = tk.BooleanVar()
-        self.delete_zip_chk = tk.Checkbutton(options_frame, text="Delete ZIP/RAR after extracting", variable=self.delete_zip_var, bg="#ffffff", font=("Segoe UI", 11), activebackground="#e3f2fd", selectcolor="#e3f2fd")
+        self.delete_zip_chk = tk.Checkbutton(options_frame, text="Delete ZIP/RAR after extracting", variable=self.delete_zip_var, bg="#ffffff", font=("Segoe UI", 11), activebackground="#e3f2fd", selectcolor="#e3f2fd", command=self.on_delete_zip_changed)
         self.delete_zip_chk.pack(side=tk.LEFT, padx=(0, 12))
-        self.delete_extracted_chk = tk.Checkbutton(options_frame, text="Delete extracted folder after copying", variable=self.delete_extracted_var, bg="#ffffff", font=("Segoe UI", 11), activebackground="#e3f2fd", selectcolor="#e3f2fd")
+        self.delete_extracted_chk = tk.Checkbutton(options_frame, text="Delete extracted folder after copying", variable=self.delete_extracted_var, bg="#ffffff", font=("Segoe UI", 11), activebackground="#e3f2fd", selectcolor="#e3f2fd", command=self.on_delete_extracted_changed)
         self.delete_extracted_chk.pack(side=tk.LEFT, padx=(0, 12))
         self.startup_var = tk.BooleanVar(value=is_startup_enabled())
         self.startup_chk = tk.Checkbutton(options_frame, text="Run at startup", variable=self.startup_var, bg="#ffffff", font=("Segoe UI", 11), activebackground="#e3f2fd", selectcolor="#e3f2fd", command=self.toggle_startup)
@@ -944,6 +938,12 @@ class UnzipperGUI:
         self.restart_monitoring()
 
     def on_copy_whole_folder_changed(self):
+        self.restart_monitoring()
+
+    def on_delete_zip_changed(self):
+        self.restart_monitoring()
+
+    def on_delete_extracted_changed(self):
         self.restart_monitoring()
 
     def on_copy_logic_apply(self):
