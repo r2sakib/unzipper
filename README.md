@@ -2,7 +2,7 @@
 
 Unzipper is an utility for automatically extracting ZIP and RAR files from a monitored folder, with advanced copy logic and much more.
 
-![Screenshot](Screenshot.png)
+![Screenshot](https://github.com/user-attachments/assets/338b7915-a9e4-4078-bdda-497b13dd9a1f)
 
 ## Features
 
